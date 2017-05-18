@@ -2,12 +2,16 @@ package httpcache
 
 import (
 	"sync"
-	"github.com/hashicorp/golang-lru/simplelru"
+	"net/http"
 )
 
 type Cache interface {
-	Put(value CachableResponseWriter)
-	Pull(hash string) CachableResponseWriter
+	Add(value Cacheable) error
+	Get(hash string) Cacheable
+	Hash(r *http.Request) string
+}
+
+type Hashable interface {
 }
 
 type lruCache struct {
@@ -22,20 +26,27 @@ type lruCache struct {
 func NewLruCache(limit int) Cache{
 	return &lruCache{limit:limit}
 }
-func (c *lruCache) Put(value CachableResponseWriter) {
-	c.Lock()
-	defer c.Unlock()
+func (c *lruCache) Add(value Cacheable) error{
 	if c.size + value.Size() > c.limit {
+		c.Lock()
 		c.oldest.Next().SetPrevious(nil)
-		c.cache[c.oldest.Key()] = nil
+		delete(c.cache, c.oldest.Key())
+		c.Unlock()
 	}
 	ce := NewCacheElement(value)
+	c.Lock()
 	ce.SetPrevious(c.newest)
 	c.newest.SetNext(ce)
 	c.cache[ce.Key()]=ce
+	c.Unlock()
+	return nil
 
 }
 
-func (c *lruCache) Pull(key string) CachableResponseWriter {
+func (c *lruCache) Get(key string) Cacheable {
 	return c.cache[key]
+}
+
+func (c *lruCache) Hash(r *http.Request) string {
+	return r.URL.RawPath
 }

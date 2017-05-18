@@ -1,7 +1,7 @@
 package httpcache
 
 type CacheElement interface {
-	CachableResponseWriter
+	Cacheable
 	SetNext(CacheElement) CacheElement
 	Next() CacheElement
 
@@ -11,12 +11,12 @@ type CacheElement interface {
 }
 
 type cacheElement struct {
-	CachableResponseWriter
+	Cacheable
 	next CacheElement
 	previous CacheElement
 }
 
-func NewCacheElement(c CachableResponseWriter) CacheElement{
+func NewCacheElement(c Cacheable) CacheElement{
 	return &cacheElement{c, nil, nil}
 }
 
