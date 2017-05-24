@@ -1,4 +1,4 @@
-package httpcache
+package cache
 
 type CacheElement interface {
 	Cacheable

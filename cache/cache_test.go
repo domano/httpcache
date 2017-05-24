@@ -1,4 +1,4 @@
-package httpcache
+package cache
 
 import (
 	"github.com/golang/mock/gomock"
@@ -109,7 +109,7 @@ func Test_Concurreny(t *testing.T) {
 			cache.Add(mock)
 			atomic.AddInt32(&done, 1)
 		}()
-		hashes = append(hashes, strconv.Itoa(i))
+		expectedHashes = append(expectedHashes, strconv.Itoa(i))
 	}
 
 	for done < 11000{
@@ -122,6 +122,8 @@ func Test_Concurreny(t *testing.T) {
 	}
 
 	assert.Equal(t, 10000, cache.(*lruCache).size)
+	assert.Equal(t, 10000, len(cache.(*lruCache).cache))
+
 
 
 	println(fmt.Sprint(done))

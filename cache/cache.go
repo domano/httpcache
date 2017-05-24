@@ -1,8 +1,7 @@
-package httpcache
+package cache
 
 import (
 	"sync"
-	"net/http"
 	"errors"
 	"fmt"
 )
@@ -10,7 +9,6 @@ import (
 type Cache interface {
 	Add(value Cacheable) error
 	Get(hash string) Cacheable
-	Hash(r *http.Request) string
 }
 
 type Hashable interface {
@@ -34,28 +32,8 @@ func (c *lruCache) Add(value Cacheable) error{
 	}
 	ce := NewCacheElement(value)
 	c.Lock()
-	if c.size + value.Size() > c.limit {
-		i := 0
-		for i < ce.Size() {
-			delete(c.cache, c.oldest.Key())
-			c.size-=c.oldest.Size()
-			i+=c.oldest.Size()
-			if c.oldest.Next() != nil {
-				newOld := c.oldest.Next().SetPrevious(nil)
-				c.oldest = newOld
-				continue
-			}
-			c.oldest=ce
-
-		}
-	}
-	if c.newest == nil {
-		c.newest = ce
-	} else {
-		ce.SetPrevious(c.newest)
-		c.newest.SetNext(ce)
-		c.newest = ce
-	}
+	c.cleanForElement(ce)
+	c.setNewest(ce)
 	if c.oldest == nil {
 		c.oldest = ce
 	}
@@ -72,6 +50,30 @@ func (c *lruCache) Get(key string) Cacheable {
 	return c.cache[key]
 }
 
-func (c *lruCache) Hash(r *http.Request) string {
-	return r.URL.RawPath
+func (c *lruCache) removeOldest() {
+	delete(c.cache, c.oldest.Key())
+	c.size-=c.oldest.Size()
+	if c.oldest.Next() != nil {
+		newOld := c.oldest.Next().SetPrevious(nil)
+		c.oldest = newOld
+	}
+}
+
+func (c *lruCache) cleanForElement(ce CacheElement) {
+	if c.size + ce.Size() > c.limit {
+		i := 0
+		for i < ce.Size() {
+			i+=c.oldest.Size()
+			c.removeOldest()
+		}
+	}
+
+}
+
+func (c *lruCache) setNewest(ce CacheElement) {
+	if c.newest != nil {
+		ce.SetPrevious(c.newest)
+		c.newest.SetNext(ce)
+	}
+	c.newest = ce
 }
