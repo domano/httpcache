@@ -3,7 +3,6 @@ package httpcache
 import (
 	"bytes"
 	"net/http"
-	"strconv"
 )
 
 type Cacheable interface {
@@ -28,7 +27,7 @@ func NewCachableResponseWriter(key string, rw http.ResponseWriter) CacheableResp
 }
 
 func (hc *cacheableResponseWriter) Key() string {
-	return strconv.Itoa(hc.buffer.Len())
+	return hc.key
 }
 
 func (hc *cacheableResponseWriter) Size() int {

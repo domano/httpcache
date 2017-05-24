@@ -3,6 +3,8 @@ package httpcache
 import (
 	"sync"
 	"net/http"
+	"errors"
+	"fmt"
 )
 
 type Cache interface {
@@ -15,7 +17,7 @@ type Hashable interface {
 }
 
 type lruCache struct {
-	sync.Mutex
+	sync.RWMutex
 	limit int
 	size int
 	newest CacheElement
@@ -24,26 +26,49 @@ type lruCache struct {
 }
 
 func NewLruCache(limit int) Cache{
-	return &lruCache{limit:limit}
+	return &lruCache{limit:limit, cache:map[string]CacheElement{}}
 }
 func (c *lruCache) Add(value Cacheable) error{
-	if c.size + value.Size() > c.limit {
-		c.Lock()
-		c.oldest.Next().SetPrevious(nil)
-		delete(c.cache, c.oldest.Key())
-		c.Unlock()
+	if  value.Size()>c.limit {
+		return errors.New(fmt.Sprintf("%s is bigger then cache limit", value.Key()))
 	}
 	ce := NewCacheElement(value)
 	c.Lock()
-	ce.SetPrevious(c.newest)
-	c.newest.SetNext(ce)
+	if c.size + value.Size() > c.limit {
+		i := 0
+		for i < ce.Size() {
+			delete(c.cache, c.oldest.Key())
+			c.size-=c.oldest.Size()
+			i+=c.oldest.Size()
+			if c.oldest.Next() != nil {
+				newOld := c.oldest.Next().SetPrevious(nil)
+				c.oldest = newOld
+				continue
+			}
+			c.oldest=ce
+
+		}
+	}
+	if c.newest == nil {
+		c.newest = ce
+	} else {
+		ce.SetPrevious(c.newest)
+		c.newest.SetNext(ce)
+		c.newest = ce
+	}
+	if c.oldest == nil {
+		c.oldest = ce
+	}
 	c.cache[ce.Key()]=ce
+	c.size+=ce.Size()
 	c.Unlock()
 	return nil
 
 }
 
 func (c *lruCache) Get(key string) Cacheable {
+	c.RLock()
+	defer c.RUnlock()
 	return c.cache[key]
 }
 
